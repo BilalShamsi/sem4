@@ -1,122 +1,80 @@
-import React from 'react';
-import { Trophy, TrendingUp, TrendingDown } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Trophy } from 'lucide-react';
+import { ethers } from 'ethers';
+import contractABI from '../abi/ReputationSystem.json';
+import contractAddress from '../contractAddress.json';
+
+interface LeaderboardEntry {
+  address: string;
+  averageScore: number;
+  totalRatings: number;
+}
 
 export default function Leaderboard() {
-  const topPerformers = [
-    {
-      id: 1,
-      name: 'Alice Johnson',
-      department: 'Engineering',
-      rating: 4.9,
-      change: 'up',
-      reviews: 45,
-    },
-    {
-      id: 2,
-      name: 'Bob Smith',
-      department: 'Design',
-      rating: 4.8,
-      change: 'down',
-      reviews: 38,
-    },
-    {
-      id: 3,
-      name: 'Carol Williams',
-      department: 'Product',
-      rating: 4.7,
-      change: 'up',
-      reviews: 42,
-    },
-  ];
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      try {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const contract = new ethers.Contract(contractAddress.address, contractABI, provider);
+        const users: string[] = await contract.getAllUsers();
+
+        const scores: LeaderboardEntry[] = await Promise.all(
+          users.map(async (user) => {
+            const [avg, total] = await contract.getAverageScore(user);
+            return {
+              address: user,
+              averageScore: Number(avg),
+              totalRatings: Number(total),
+            };
+          })
+        );
+
+        const sorted = scores
+          .filter((u) => u.totalRatings > 0)
+          .sort((a, b) => b.averageScore - a.averageScore);
+
+        setLeaderboard(sorted);
+      } catch (error) {
+        console.error('Error fetching leaderboard:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLeaderboard();
+  }, []);
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-gray-900">Performance Leaderboard</h1>
+      <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
+        <Trophy className="text-yellow-500" /> Leaderboard
+      </h1>
 
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        <div className="px-4 py-5 sm:px-6">
-          <div className="flex items-center">
-            <Trophy className="h-6 w-6 text-yellow-400" />
-            <h3 className="ml-2 text-lg leading-6 font-medium text-gray-900">
-              Top Performers
-            </h3>
-          </div>
+      {loading ? (
+        <p className="text-gray-500">Loading leaderboard...</p>
+      ) : leaderboard.length === 0 ? (
+        <p className="text-gray-500">No ratings available yet.</p>
+      ) : (
+        <div className="bg-white shadow rounded-lg">
+          <ul className="divide-y divide-gray-200">
+            {leaderboard.map((entry, index) => (
+              <li key={entry.address} className="px-4 py-4 sm:px-6">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium text-indigo-600">
+                    #{index + 1} - {entry.address.slice(0, 6)}...{entry.address.slice(-4)}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    Avg Score: {entry.averageScore} ({entry.totalRatings} ratings)
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
-        <div className="border-t border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Rank
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Name
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Department
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Rating
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Reviews
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Trend
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {topPerformers.map((person, index) => (
-                <tr key={person.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">#{index + 1}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {person.name}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">{person.department}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{person.rating}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">{person.reviews}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {person.change === 'up' ? (
-                      <TrendingUp className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <TrendingDown className="h-5 w-5 text-red-500" />
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
