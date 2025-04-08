@@ -1,0 +1,5 @@
+npm install ethers
+npm install express
+npm install --save-dev @nomicfoundation/hardhat-toolbox
+npm install dotenv
+npx hardhat run scripts/deploy.ts --network sepolia
