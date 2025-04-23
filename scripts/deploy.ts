@@ -11,7 +11,11 @@ async function main() {
   const address = await contract.getAddress();
 
   const filePath = path.join(__dirname, "../project/src/contractAddress.json");
-  fs.writeFileSync(filePath, JSON.stringify({ address }, null, 2));
+  const data = {
+    ReputationSystem: address, // 👈 This line fixes the key mismatch
+  };
+
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 
   console.log("✅ Contract deployed to:", address);
   console.log("📦 Address written to project/src/contractAddress.json");

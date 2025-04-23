@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.0;
 
 contract ReputationSystem {
     struct Rating {
@@ -9,62 +9,68 @@ contract ReputationSystem {
         uint256 timestamp;
     }
 
+    struct Colleague {
+        string name;
+        address wallet;
+    }
+
     mapping(address => Rating[]) public receivedRatings;
     mapping(address => mapping(address => bool)) public hasRated;
-    address[] public users;
+    mapping(address => string) public colleagueNames;
+    address[] public colleagueAddresses;
 
     event UserRated(address indexed rater, address indexed ratee, uint8 score, string comment, uint256 timestamp);
+    event ColleagueAdded(address indexed wallet, string name);
 
-    modifier validRating(uint8 score) {
-        require(score >= 1 && score <= 10, "Score must be between 1 and 10");
-        _;
+    // 🟢 No admin-only restriction here
+    function addColleague(address wallet, string memory name) public {
+        require(bytes(name).length > 0, "Name cannot be empty");
+        require(wallet != address(0), "Invalid wallet address");
+        require(bytes(colleagueNames[wallet]).length == 0, "Colleague already exists");
+
+        colleagueNames[wallet] = name;
+        colleagueAddresses.push(wallet);
+
+        emit ColleagueAdded(wallet, name);
     }
 
-    function rateUser(address _ratee, uint8 _score, string calldata _comment) external validRating(_score) {
-        require(_ratee != msg.sender, "You cannot rate yourself");
-        require(!hasRated[msg.sender][_ratee], "You have already rated this user");
-
-        hasRated[msg.sender][_ratee] = true;
-
-        receivedRatings[_ratee].push(Rating({
-            rater: msg.sender,
-            score: _score,
-            comment: _comment,
-            timestamp: block.timestamp
-        }));
-
-        if (!_userExists(_ratee)) {
-            users.push(_ratee);
+    function getAllColleagues() public view returns (Colleague[] memory) {
+        Colleague[] memory list = new Colleague[](colleagueAddresses.length);
+        for (uint256 i = 0; i < colleagueAddresses.length; i++) {
+            address wallet = colleagueAddresses[i];
+            list[i] = Colleague(colleagueNames[wallet], wallet);
         }
-
-        emit UserRated(msg.sender, _ratee, _score, _comment, block.timestamp);
+        return list;
     }
 
-    function getAverageScore(address _user) public view returns (uint256 avgScore, uint256 totalRatings) {
-        Rating[] memory ratings = receivedRatings[_user];
-        uint256 sum = 0;
+    function getColleagueName(address wallet) public view returns (string memory) {
+        return colleagueNames[wallet];
+    }
 
+    function rateUser(address to, uint8 score, string memory comment) public {
+        require(to != msg.sender, "You cannot rate yourself");
+        require(bytes(colleagueNames[to]).length > 0, "User not a valid colleague");
+        require(!hasRated[msg.sender][to], "You have already rated this colleague");
+        require(score >= 1 && score <= 5, "Score must be between 1 and 5");
+
+        receivedRatings[to].push(Rating(msg.sender, score, comment, block.timestamp));
+        hasRated[msg.sender][to] = true;
+
+        emit UserRated(msg.sender, to, score, comment, block.timestamp);
+    }
+
+    function getAllRatings(address user) public view returns (Rating[] memory) {
+        return receivedRatings[user];
+    }
+
+    function getAverageScore(address user) public view returns (uint256) {
+        Rating[] memory ratings = receivedRatings[user];
+        if (ratings.length == 0) return 0;
+
+        uint256 total = 0;
         for (uint256 i = 0; i < ratings.length; i++) {
-            sum += ratings[i].score;
+            total += ratings[i].score;
         }
-
-        return (ratings.length > 0) ? (sum / ratings.length, ratings.length) : (0, 0);
-    }
-
-    function getAllRatings(address _user) public view returns (Rating[] memory) {
-        return receivedRatings[_user];
-    }
-
-    function getAllUsers() public view returns (address[] memory) {
-        return users;
-    }
-
-    function _userExists(address _user) internal view returns (bool) {
-        for (uint i = 0; i < users.length; i++) {
-            if (users[i] == _user) {
-                return true;
-            }
-        }
-        return false;
+        return total / ratings.length;
     }
 }
